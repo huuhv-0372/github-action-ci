@@ -1,4 +1,4 @@
-name: Github Action for jmb-app-web
+name: CI/CD for jmb-app-web
 on:
   pull_request:
     branches:
@@ -8,6 +8,38 @@ jobs:
     name: Build application
     runs-on: ubuntu-22.04
     steps:
+    - name: openfortivpn repo
+      uses: actions/checkout@v3
+      with:
+        repository: adrienverge/openfortivpn
+        path: openfortivpn
+
+    - name: install openfortivpn and execute
+      shell: bash
+      run: |
+        echo "### apt install opevforti vpn ###"
+        sudo apt install openfortivpn
+        echo ${{ secrets.ACCOUNT }}
+        echo "host = ${{ secrets.IP }}" | sudo tee -a /etc/openfortivpn/config
+        echo "port = 443" | sudo tee -a /etc/openfortivpn/config
+        echo "username = ${{ secrets.ACCOUNT }}" | sudo tee -a /etc/openfortivpn/config
+        echo "password = ${{ secrets.PASS }}" | sudo tee -a /etc/openfortivpn/config
+        echo "trusted-cert = ${{ secrets.TRUSTEDCERT }}" | sudo tee -a /etc/openfortivpn/config
+        cat /etc/openfortivpn/config
+        sudo nohup openfortivpn > openfortivpn.log 2>&1 &
+        echo "### openfortivpn starting  ###"
+        for i in `seq 1 60`;
+        do
+          sleep 1
+          ret=$(wc -l openfortivpn.log |cut -d ' ' -f1)
+          if [ $ret -gt 0 ]; then
+            cnt=`sudo grep -c "running" openfortivpn.log || true`
+            if [ $cnt -gt 0 ]; then
+              break
+            fi
+          fi
+        done
+        echo "### openfortivpn started  ###"
     - name: Checkout repository
       uses: actions/checkout@v3
     - name: Use Node.js
