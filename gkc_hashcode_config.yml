@@ -1,0 +1,18 @@
+versions: 1.0
+folder_path: .
+languages_setting:
+  ReactJS:
+    cmt: '// %{hash_code_prefix} : %{hash_code}'
+    ext: '.tsx|.ts'
+apply_languages:
+  - ReactJS
+
+hash_code_prefix: 'gkc_hash_code'
+hash_code: 01GV08E07716MKFVFKX31BQC9G
+ignore_file_patterns:
+  - node_modules
+
+ignore_files:
+  - gkc_hashcode_config.yml
+  - gkc_util_hashcode_script.sh
+  - db/schema.rb
