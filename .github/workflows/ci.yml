@@ -1,8 +1,5 @@
 name: Github Action test NodeJS CI
 on:
-  push:
-    branches:
-      - develop
   pull_request:
     branches:
       - develop
@@ -11,12 +8,14 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Use Node.js
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v3
       with:
         node-version: '18.15.0'
-    - name: Run Yarn 
-      run: yarn
-    - name: Run tests
-      run: yarn test
+    - name: Run Yarn install
+      run: yarn install
+    - name: Run lint
+      run: yarn lint
+    - name: Run build
+      run: yarn build
