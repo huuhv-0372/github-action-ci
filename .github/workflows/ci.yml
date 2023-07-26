@@ -16,6 +16,6 @@ jobs:
     - name: Run Yarn install
       run: yarn install
     - name: Run lint
-      run: yarn lint
+      run: yarn eslint
     - name: Run build
       run: yarn build
