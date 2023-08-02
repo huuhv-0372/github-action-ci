@@ -1,21 +1,71 @@
-name: Github Action test NodeJS CI
+name: Build, lint & test
+
 on:
   pull_request:
     branches:
       - develop
+      - develop-sun
+
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-20.04
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-    - name: Use Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18.15.0'
-    - name: Run Yarn install
-      run: yarn install
-    - name: Run lint
-      run: yarn lint
-    - name: Run build
-      run: yarn build
+      - name: openfortivpn repo
+        uses: actions/checkout@v3
+        with:
+          repository: adrienverge/openfortivpn
+          path: openfortivpn
+
+      - name: install openfortivpn and execute
+        shell: bash
+        run: |
+          echo "### apt install opevforti vpn ###"
+          sudo apt install openfortivpn
+          echo ${{ secrets.ACCOUNT }}
+          echo "host = ${{ secrets.IP }}" | sudo tee -a /etc/openfortivpn/config
+          echo "port = 443" | sudo tee -a /etc/openfortivpn/config
+          echo "username = ${{ secrets.ACCOUNT }}" | sudo tee -a /etc/openfortivpn/config
+          echo "password = ${{ secrets.PASS }}" | sudo tee -a /etc/openfortivpn/config
+          echo "trusted-cert = ${{ secrets.TRUSTEDCERT }}" | sudo tee -a /etc/openfortivpn/config
+          cat /etc/openfortivpn/config
+          sudo nohup openfortivpn > openfortivpn.log 2>&1 &
+          echo "### openfortivpn starting  ###"
+          for i in `seq 1 60`;
+          do
+            sleep 1
+            ret=$(wc -l openfortivpn.log |cut -d ' ' -f1)
+            if [ $ret -gt 0 ]; then
+              cnt=`sudo grep -c "running" openfortivpn.log || true`
+              if [ $cnt -gt 0 ]; then
+                break
+              fi
+            fi
+          done
+          echo "### openfortivpn started  ###"
+
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18.15.0
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Copy env
+        run: cp .env.example .env
+
+      - name: Prisma generate
+        run: npm run prisma:generate
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint:detect
+
+      - name: Test
+        run: |
+          npm run test
+          npm run test:e2e
