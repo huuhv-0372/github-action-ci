@@ -1,0 +1,78 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - develop-sun
+
+jobs:
+  deploy:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: openfortivpn repo
+        uses: actions/checkout@v3
+        with:
+          repository: adrienverge/openfortivpn
+          path: openfortivpn
+
+      - name: install openfortivpn and execute
+        shell: bash
+        run: |
+          echo "### apt install opevforti vpn ###"
+          sudo apt install openfortivpn
+          echo ${{ secrets.ACCOUNT }}
+          echo "host = ${{ secrets.IP }}" | sudo tee -a /etc/openfortivpn/config
+          echo "port = 443" | sudo tee -a /etc/openfortivpn/config
+          echo "username = ${{ secrets.ACCOUNT }}" | sudo tee -a /etc/openfortivpn/config
+          echo "password = ${{ secrets.PASS }}" | sudo tee -a /etc/openfortivpn/config
+          echo "trusted-cert = ${{ secrets.TRUSTEDCERT }}" | sudo tee -a /etc/openfortivpn/config
+          cat /etc/openfortivpn/config
+          sudo nohup openfortivpn > openfortivpn.log 2>&1 &
+          echo "### openfortivpn starting  ###"
+          for i in `seq 1 60`;
+          do
+            sleep 1
+            ret=$(wc -l openfortivpn.log |cut -d ' ' -f1)
+            if [ $ret -gt 0 ]; then
+              cnt=`sudo grep -c "running" openfortivpn.log || true`
+              if [ $cnt -gt 0 ]; then
+                break
+              fi
+            fi
+          done
+          echo "### openfortivpn started  ###"
+
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18.15.0
+          cache: 'npm'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build for deployment
+        run: npm run deploy:build
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.ASSET_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ASSET_SECRET_ACCESS_KEY }}
+          aws-region: ap-northeast-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./docker/development/Dockerfile.build
+          push: true
+          tags: ${{ secrets.ECR_BUILD_TAG }}:latest
+          cache-from: type=registry,ref=${{ secrets.ECR_BUILD_TAG }}:latest
+          cache-to: type=inline
+          provenance: false
